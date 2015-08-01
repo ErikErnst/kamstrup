@@ -1,17 +1,14 @@
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <termios.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include "setup_optical_eye.h"
+// Copyright (c) 2015, Erik Ernst. All rights reserved. Use of this
+// source code is governed by a BSD-style license that can be found in
+// the LICENSE file.
 
-#define OPTICAL_EYE_DEVICE "/dev/ttyUSB0"
-#define OPTICAL_EYE_BAUD B9600
+#include <stdio.h>
+#include "config.h"
+#include "optical_eye_utils.h"
 
 int main(int argc, char *argv[])
 {
-    int optical_eye_fd = setup_optical_eye();
+    int optical_eye_fd = setup_optical_eye(DEVICE, BAUDRATE);
     write(optical_eye_fd, "/?!\r\n", 5);
     while (1) {
         char c;
