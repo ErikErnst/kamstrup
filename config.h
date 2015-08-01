@@ -6,4 +6,3 @@
 
 #define DEVICE "/dev/ttyUSB0"
 #define BAUDRATE B9600
-

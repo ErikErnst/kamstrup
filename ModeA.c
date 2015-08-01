@@ -3,6 +3,7 @@
 // the LICENSE file.
 
 #include <stdio.h>
+#include <stropts.h>
 #include "config.h"
 #include "optical_eye_utils.h"
 
@@ -13,8 +14,9 @@ int main(int argc, char *argv[])
     while (1) {
         char c;
         int received = read(optical_eye_fd, &c, sizeof(c));
-        if (received == 1) printf("%c", c);
+        if (received == 1) show_char(c);
         else break;
     }
+    ioctl(optical_eye_fd, I_FLUSH, FLUSHW);
     return 0;
 }

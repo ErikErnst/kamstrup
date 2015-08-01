@@ -3,3 +3,4 @@
 // the LICENSE file.
 
 int setup_optical_eye(char const *optical_eye_device, int optical_eye_baudrate);
+void show_char(char c);
