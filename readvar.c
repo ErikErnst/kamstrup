@@ -330,6 +330,13 @@ void show_package_hex(unsigned char const *buffer, int length) {
     }
 }
 
+void show_package_ascii(unsigned char const *buffer, int length) {
+    int index;
+    for (index = 0; index < length; index++) {
+        show_char(buffer[index]);
+    }
+}
+
 void show_package_named_char(unsigned char const *buffer, int length) {
     int index;
     for (index = 0; index < length; index++) {
@@ -364,8 +371,56 @@ double decode_float_value(unsigned char length, unsigned char *representation) {
     return value;
 }
 
+void show_time_value(unsigned char const *buffer, int const length, char const *unit) {
+    int hhmmss = 16777216 * buffer[2] + 65536 * buffer[3] + 256 * buffer[4] + buffer[5];
+    int ss = hhmmss % 100;
+    int hhmm = hhmmss / 100;
+    int mm = hhmm % 100;
+    int hh = hhmm / 100;
+    printf("%02d:%02d:%02d [%s", hh, mm, ss, unit);
+    if (buffer[0] != 4 || buffer[1] != 0) {
+        printf(", unexpected data length: %d]\n", buffer[0] + 256 * buffer[1]);
+    } else {
+        printf("]\n");
+    }
+}
+
+char* const month_name[] = {
+    "(unused)",
+    "Jan", "Feb", "Mar", "Apr",
+    "May", "Jun", "Jul", "Aug",
+    "Sep", "Oct", "Nov", "Dec"
+};
+
+void show_date3_value(unsigned char const *buffer, int const length, char const *unit) {
+    int yymmdd = 16777216 * buffer[2] + 65536 * buffer[3] + 256 * buffer[4] + buffer[5];
+    int dd = yymmdd % 100;
+    int yymm = yymmdd / 100;
+    int mm = yymm % 100;
+    int yy = yymm / 100;
+    printf("%02d, %s, %02d [%s", 2000 + yy, month_name[mm], dd, unit);
+    if (buffer[0] != 4 || buffer[1] != 0) {
+        printf(", unexpected data length: %d]\n", buffer[0] + 256 * buffer[1]);
+    } else {
+        printf("]\n");
+    }
+}
+
+void show_ascii_value(unsigned char const *buffer, int const length, char const *unit) {
+    // Apparently, the length is encoded twice for ASCII data:
+    // One time in the general data format, and one more time in
+    // the data area itself. We use the former to decide on the
+    // amount of text shown, and print the latter, such that the
+    // user can see both (they seem to follow each other, but if
+    // they sometimes differ the user will at least get a hint).
+    int embedded_length = buffer[0] + 256 * buffer[1];
+    putchar('"');
+    show_package_ascii(buffer + 2, length - 2);
+    printf("\" [%s, length %d]\n", unit, embedded_length);
+}
+
 void show_unsupported_value(char const *kind, unsigned char const *buffer,
-                            int length, char const *unit) {
+                            int const length, char const *unit) {
     printf("%s not yet supported, ", kind);
     show_package_hex(buffer, length);
     printf(" [%s]\n", unit);
@@ -423,7 +478,7 @@ void show_package(unsigned char *buffer, int length, int var_id) {
                 done = 1;
                 break;
             case UR_TIME:
-                show_unsupported_value("TIME", buffer + 6, length - 9, unit);
+                show_time_value(buffer + 6, length - 9, unit);
                 done = 1;
                 break;
             case UR_DATE2:
@@ -431,7 +486,7 @@ void show_package(unsigned char *buffer, int length, int var_id) {
                 done = 1;
                 break;
             case UR_DATE3:
-                show_unsupported_value("DATE3", buffer + 6, length - 9, unit);
+                show_date3_value(buffer + 6, length - 9, unit);
                 done = 1;
                 break;
             case UR_DATE4:
@@ -439,7 +494,7 @@ void show_package(unsigned char *buffer, int length, int var_id) {
                 done = 1;
                 break;
             case UR_ASCII:
-                show_unsupported_value("ASCII", buffer + 6, length - 9, unit);
+                show_ascii_value(buffer + 6, length - 9, unit);
                 done = 1;
                 break;
             case UR_BITS:
