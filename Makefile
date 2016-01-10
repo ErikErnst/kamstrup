@@ -2,7 +2,7 @@
 # source code is governed by a BSD-style license that can be found in
 # the LICENSE file.
 
-all: iec1107 heartbeat recentload
+all: iec1107 heartbeat readvar recentload
 
 iec1107: iec1107.o optical_eye_utils.o
 	$(CC) -g -o iec1107 optical_eye_utils.o iec1107.o 

@@ -19,7 +19,9 @@ typedef struct _id2str {
 
 #define unknown_variable_description "Meter response seen, variable unknown"
 
-// Units, provided by Erik Jensen.
+// Units, provided by Erik Jensen. Unit 51 was empty, I made the guess that
+// it is used for variable length integer values, for things that can be
+// counted.
 
 static char* units[] = {
     "Unit0",                                          // 0 (Was empty).
@@ -40,7 +42,7 @@ static char* units[] = {
     "ton/h",                                          // 45 Flow of mass.
     "h",                                              // 46 Time.
     "hh,mm,ss", "yy,mm,dd", "yyyy,mm,dd", "mm,dd",    // 47-50 Composite time.
-    "Unit51",                                         // 51 (Was empty).
+    "int",                                            // 51 Counts (was empty).
     "bar",                                            // 52 Pressure.
     "RTC",                                            // 53 Composite time.
     "ASCII",                                          // 54 Textual data.
@@ -55,7 +57,8 @@ static int units_length = 65;
 typedef enum _UNIT_REPRESENTATION {
     UR_UNKNOWN, UR_INT, UR_FLOAT, UR_BYTE, UR_TIME,
     UR_DATE2, UR_DATE3, UR_DATE4,
-    UR_ASCII, UR_BITS, UR_RTC, UR_RTCQ, UR_DATETIME
+    UR_ASCII, UR_BITS, UR_RTC, UR_RTCQ, UR_DATETIME,
+    UR_VARINT
 } UNIT_REPRESENTATION;
 
 static UNIT_REPRESENTATION unit_representation[] = {
@@ -77,7 +80,7 @@ static UNIT_REPRESENTATION unit_representation[] = {
     UR_FLOAT,                                         // 45 Flow of mass.
     UR_BYTE,                                          // 46 Time.
     UR_TIME,    UR_DATE3,   UR_DATE4,   UR_DATE2,     // 47-50 Composite time.
-    UR_UNKNOWN,                                       // 51
+    UR_VARINT,                                        // 51
     UR_FLOAT,                                         // 52 Pressure.
     UR_RTC,                                           // 53 Composite time.
     UR_ASCII,                                         // 54 Textual data.
@@ -354,7 +357,8 @@ static unsigned char readvar_unknown_response[] = {
 };
 static int readvar_unknown_response_length = 6;
 
-double decode_float_value(unsigned char length, unsigned char *representation) {
+double decode_float_value(unsigned char length,
+                          unsigned char *representation) {
     int exponent = representation[0] & 0x3f;
     if (representation[0] & 0x40) exponent = -exponent;
 
@@ -371,8 +375,17 @@ double decode_float_value(unsigned char length, unsigned char *representation) {
     return value;
 }
 
-void show_time_value(unsigned char const *buffer, int const length, char const *unit) {
-    int hhmmss = 16777216 * buffer[2] + 65536 * buffer[3] + 256 * buffer[4] + buffer[5];
+void show_unsupported_value(char const *kind, unsigned char const *buffer,
+                            int const length, char const *unit) {
+    printf("%s not yet supported, ", kind);
+    show_package_hex(buffer, length);
+    printf(" [%s]\n", unit);
+}
+
+void show_time_value(unsigned char const *buffer, int const length,
+                     char const *unit) {
+    int hhmmss = 16777216 * buffer[2] + 65536 * buffer[3] +
+        256 * buffer[4] + buffer[5];
     int ss = hhmmss % 100;
     int hhmm = hhmmss / 100;
     int mm = hhmm % 100;
@@ -386,19 +399,21 @@ void show_time_value(unsigned char const *buffer, int const length, char const *
 }
 
 char* const month_name[] = {
-    "(unused)",
+    "(Undefined month: zero)",
     "Jan", "Feb", "Mar", "Apr",
     "May", "Jun", "Jul", "Aug",
     "Sep", "Oct", "Nov", "Dec"
 };
 
-void show_date3_value(unsigned char const *buffer, int const length, char const *unit) {
-    int yymmdd = 16777216 * buffer[2] + 65536 * buffer[3] + 256 * buffer[4] + buffer[5];
+void show_date3_value(unsigned char const *buffer, int const length,
+                      char const *unit) {
+    int yymmdd = 16777216 * buffer[2] + 65536 * buffer[3] +
+        256 * buffer[4] + buffer[5];
     int dd = yymmdd % 100;
     int yymm = yymmdd / 100;
     int mm = yymm % 100;
     int yy = yymm / 100;
-    printf("%02d, %s, %02d [%s", 2000 + yy, month_name[mm], dd, unit);
+    printf("%02d, %s, %02d [%s", yy, month_name[mm], dd, unit);
     if (buffer[0] != 4 || buffer[1] != 0) {
         printf(", unexpected data length: %d]\n", buffer[0] + 256 * buffer[1]);
     } else {
@@ -406,7 +421,8 @@ void show_date3_value(unsigned char const *buffer, int const length, char const 
     }
 }
 
-void show_ascii_value(unsigned char const *buffer, int const length, char const *unit) {
+void show_ascii_value(unsigned char const *buffer, int const length,
+                      char const *unit) {
     // Apparently, the length is encoded twice for ASCII data:
     // One time in the general data format, and one more time in
     // the data area itself. We use the former to decide on the
@@ -419,11 +435,35 @@ void show_ascii_value(unsigned char const *buffer, int const length, char const 
     printf("\" [%s, length %d]\n", unit, embedded_length);
 }
 
-void show_unsupported_value(char const *kind, unsigned char const *buffer,
-                            int const length, char const *unit) {
-    printf("%s not yet supported, ", kind);
-    show_package_hex(buffer, length);
-    printf(" [%s]\n", unit);
+void show_varint_value(unsigned char const *buffer, int const length,
+                       char const *unit) {
+    // This is about unit 51 which is currently undocumented; guessing
+    // that it contains an variable length unsigned integer number in
+    // big-endian format which may be used for counting things, we show
+    // it in a decimal format. We use the embedded length to decide on
+    // the number of bytes to include, and give a hint in the case where
+    // the specified total buffer length differs.
+    int embedded_length = buffer[0] + 256 * buffer[1];
+    if (embedded_length > length - 2) {
+        // The value seems to occupy more bytes than the buffer contains.
+        // We cannot interpret data beyond the data area that we have
+        // received, so we drop out entirely here, and show the raw data.
+        show_unsupported_value("Malformed INT", buffer, length, unit);
+    } else {
+        int index;
+        unsigned long int value = 0;
+        for (index = 0; index < embedded_length; index++) {
+            value <<= 8;
+            value |= buffer[index + 2];
+        }
+        if (embedded_length == length - 2) {
+            // Data area used exactly, as expected.
+            printf("%lu [%s, length %d]\n", value, unit, embedded_length);
+        } else {
+            // embedded_length < length - 2:
+            printf("[%s, length %d]\n", unit, embedded_length);
+        }
+    }
 }
 
 void show_package(unsigned char *buffer, int length, int var_id) {
@@ -459,63 +499,75 @@ void show_package(unsigned char *buffer, int length, int var_id) {
     }
     char const *unit = "UnknownUnit";
     UNIT_REPRESENTATION representation = UR_UNKNOWN;
+    void const *data = buffer + 6;
+    unsigned int const data_length = length - 9;
     if (buffer[5] < units_length) {
         representation = buffer[5];
         unit = units[representation];
+
         switch (unit_representation[representation]) {
             case UR_FLOAT: {
                 double value = decode_float_value(buffer[6], buffer + 7);
-                printf("%0.4f %s\n", value, unit);
-                if (length == 15) done = 1;
+                if (length == 15) {
+                    printf("%0.4f %s\n", value, unit);
+                    done = 1;
+                } else if (length == 13) {
+                    printf("%0.3f %s\n", value, unit);
+                    done = 1;
+                }
                 break;
             }
             case UR_INT:
-                show_unsupported_value("INT", buffer + 6, length - 9, unit);
+                show_unsupported_value("INT", data, data_length, unit);
                 done = 1;
                 break;
             case UR_BYTE:
-                show_unsupported_value("BYTE", buffer + 6, length - 9, unit);
+                show_unsupported_value("BYTE", data, data_length, unit);
                 done = 1;
                 break;
             case UR_TIME:
-                show_time_value(buffer + 6, length - 9, unit);
+                show_time_value(data, data_length, unit);
                 done = 1;
                 break;
             case UR_DATE2:
-                show_unsupported_value("DATE2", buffer + 6, length - 9, unit);
+                show_unsupported_value("DATE2", data, data_length, unit);
                 done = 1;
                 break;
             case UR_DATE3:
-                show_date3_value(buffer + 6, length - 9, unit);
+                show_date3_value(data, data_length, unit);
                 done = 1;
                 break;
             case UR_DATE4:
-                show_unsupported_value("DATE4", buffer + 6, length - 9, unit);
+                show_unsupported_value("DATE4", data, data_length, unit);
                 done = 1;
                 break;
             case UR_ASCII:
-                show_ascii_value(buffer + 6, length - 9, unit);
+                show_ascii_value(data, data_length, unit);
                 done = 1;
                 break;
             case UR_BITS:
-                show_unsupported_value("BITS", buffer + 6, length - 9, unit);
+                show_unsupported_value("BITS", data, data_length, unit);
                 done = 1;
                 break;
             case UR_RTC:
-                show_unsupported_value("RTC", buffer + 6, length - 9, unit);
+                show_unsupported_value("RTC", data, data_length, unit);
                 done = 1;
                 break;
             case UR_RTCQ:
-                show_unsupported_value("RTCQ", buffer + 6, length - 9, unit);
+                show_unsupported_value("RTCQ", data, data_length, unit);
                 done = 1;
                 break;
             case UR_DATETIME:
-                show_unsupported_value("DATETIME", buffer + 6, length - 9, 
-                                       unit);
+                show_unsupported_value("DATETIME", data, data_length, unit);
+                done = 1;
+                break;
+            case UR_VARINT:
+                show_varint_value(data, data_length, unit);
+                done = 1;
                 break;
             case UR_UNKNOWN:
                 printf("Raw data:");
-                show_package_hex(buffer + 6, length - 9);
+                show_package_hex(data, data_length);
                 if (buffer[5] >= units_length || *units[buffer[5]]) {
                     printf(" [no unit: %d]\n", buffer[5]);
                 } else {
@@ -533,7 +585,8 @@ void show_package(unsigned char *buffer, int length, int var_id) {
                buffer[5], units_length);
     }
     if (!done) {
-        show_package_named_char(buffer, length);
+        show_package_hex(buffer, length);
+        printf("\n");
     }
 }
 
