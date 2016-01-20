@@ -1,0 +1,8 @@
+#!/bin/bash --norc
+
+timestamp=`/bin/date +%Y%m%d-%H%M`
+
+for n in `seq 58` 199 222 231 `seq 1001 1272` 1536 1537 1538 2010 2011 2018; do
+  ./readvar $n
+  sleep 1
+done | tee ~/readallvars-output-$timestamp.txt
