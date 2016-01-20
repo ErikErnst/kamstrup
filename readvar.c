@@ -42,7 +42,7 @@ static char* units[] = {
     "ton/h",                                          // 45 Flow of mass.
     "h",                                              // 46 Time.
     "hh,mm,ss", "yy,mm,dd", "yyyy,mm,dd", "mm,dd",    // 47-50 Composite time.
-    "[int]",                                          // 51 Counts?
+    "int?",                                           // 51 Counts?
     "bar",                                            // 52 Pressure.
     "RTC",                                            // 53 Composite time.
     "ASCII",                                          // 54 Textual data.
@@ -130,7 +130,7 @@ static id2str var_data[] = {
     {  32, "Active energy A23 Tariff 4"},
     {  33, "Reactive energy R12 Tariff 4"},
     {  34, "Reactive energy R34 Tariff 4"},
-    {  35, "Average power P+"}, /*  */
+    {  35, "Average power P+"},
     {  36, "Average power P-"},
     {  37, "Average power Q1Q2"},
     {  38, "Average power Q3O4"},
@@ -505,9 +505,30 @@ void show_date3_value(unsigned char const *buffer, int const length,
     int yymm = yymmdd / 100;
     int mm = yymm % 100;
     int yy = yymm / 100;
-    printf("%02d, %s, %02d [%s", yy, month_name[mm], dd, unit);
+    printf("%02d-%s-%02d [%s", yy, month_name[mm], dd, unit);
     if (buffer[0] != 4 || buffer[1] != 0) {
         printf(", unexpected data length: %d]\n", buffer[0] + 256 * buffer[1]);
+    } else {
+        printf("]\n");
+    }
+}
+
+void show_rtc_value(unsigned char const *buffer, int const length,
+                    char const *unit) {
+    int unknown1 = buffer[2];
+    int unknown2 = buffer[3];
+    int second = buffer[4];
+    int minute = buffer[5];
+    int hour = buffer[6];
+    int date = buffer[7];
+    int month = buffer[8];
+    int year = buffer[9] + 2000;
+    printf("%02d:%02d:%02d %02d-%s-%02d [%s, unknown part: %02x %02x",
+           hour, minute, second, date, month_name[month], year,
+           unit, unknown1, unknown2);
+    if (buffer[0] != 8 || buffer[1] != 0) {
+        printf(", unexpected rtc data length: %d]\n", 
+               buffer[0] + 256 * buffer[1]);
     } else {
         printf("]\n");
     }
@@ -642,7 +663,7 @@ void show_package(unsigned char *buffer, int length, int var_id) {
                 done = 1;
                 break;
             case UR_RTC:
-                show_unsupported_value("RTC", data, data_length, unit);
+                show_rtc_value(data, data_length, unit);
                 done = 1;
                 break;
             case UR_RTCQ:
