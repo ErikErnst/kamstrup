@@ -5,7 +5,9 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <termios.h>
+#include <unistd.h>
 #include "optical_eye_utils.h"
 
 void fail(char const *msg)
@@ -121,7 +123,7 @@ void show_char(unsigned char c)
                 output = hex_output;
             }
     }
-    printf(output);
+    printf("%s", output);
 }
 
 static char *baudrate_names[] = {

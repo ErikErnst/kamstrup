@@ -7,6 +7,8 @@
 
 #define BUFFER_LENGTH 8192
 
+void fail(char const *msg);
+
 int setup_optical_eye(char const *optical_eye_device, 
                       int optical_eye_baudrate,
                       int is_7e1);
