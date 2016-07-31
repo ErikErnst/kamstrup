@@ -5,15 +5,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stropts.h>
+#include <unistd.h>
 #include "config.h"
 #include "optical_eye_utils.h"
 
 #define MESSAGE_LINE_COUNT 10
+#define DEFAULT_BAUDRATE B300
 
 int main(int argc, char *argv[])
 {
     char *device = DEVICE;
-    int baudrate = BAUDRATE;
+    int baudrate = DEFAULT_BAUDRATE;
     if (argc > 3) {
         printf("Usage: %s [device [baudrate]]\n", argv[0]);
         exit(0);
