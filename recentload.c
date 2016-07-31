@@ -9,6 +9,8 @@
 #include "config.h"
 #include "optical_eye_utils.h"
 
+#define DEFAULT_BAUDRATE B9600
+
 static char loadlog_request[] = {
     '\x80', '\x3f', '\x10', '\x01', '\x03',
     '\xe9', '\x7c', '\xd4', '\x0d'
@@ -18,7 +20,7 @@ static int loadlog_request_length = 9;
 int main(int argc, char *argv[])
 {
     char *device = DEVICE;
-    int baudrate = BAUDRATE;
+    int baudrate = DEFAULT_BAUDRATE;
     if (argc > 3) {
         printf("Usage: %s [device [baudrate]]\n", argv[0]);
         exit(0);

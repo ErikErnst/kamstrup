@@ -9,6 +9,8 @@
 #include "config.h"
 #include "optical_eye_utils.h"
 
+#define DEFAULT_BAUDRATE B9600
+
 static char heartbeat_message[] = {
     '\x80', '\x3f', '\x10', '\x01', '\x04',
     '\x1b', '\xf9', '\xe9', '\x82', '\x0d'
@@ -18,7 +20,7 @@ static int heartbeat_message_length = 10;
 int main(int argc, char *argv[])
 {
     char *device = DEVICE;
-    int baudrate = BAUDRATE;
+    int baudrate = DEFAULT_BAUDRATE;
     if (argc > 3) {
         printf("Usage: %s [device [baudrate]]\n", argv[0]);
         exit(0);

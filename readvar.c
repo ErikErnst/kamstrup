@@ -12,6 +12,8 @@
 #include "config.h"
 #include "optical_eye_utils.h"
 
+#define DEFAULT_BAUDRATE B9600
+
 typedef struct _id2str {
     unsigned int id;
     char const *description;
@@ -725,7 +727,7 @@ void usage(char *self) {
 int main(int argc, char *argv[])
 {
     char *device = DEVICE;
-    int baudrate = BAUDRATE;
+    int baudrate = DEFAULT_BAUDRATE;
     int var_id = 1023; // Default variable identifier: Actual Power P14.
 
     if (argc < 2 || argc > 4) usage(argv[0]);
@@ -738,12 +740,12 @@ int main(int argc, char *argv[])
         }
     }
     if (argc > 2) {
-        device = argv[1];
+        device = argv[2];
         printf("%s: Using device %s\n", argv[0], device);
     }
     if (argc > 3) {
-        baudrate = baudrate_of(argv[0], argv[2]);
-        printf("%s: Using baudrate %s\n", argv[0], argv[2]);
+        baudrate = baudrate_of(argv[0], argv[3]);
+        printf("%s: Using baudrate %s\n", argv[0], argv[3]);
     }
 
     int optical_eye_fd = setup_optical_eye(device, baudrate, IS_8N2);
